@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#03040a">
+  <title>Particle Universe</title>
+  <style>
+/* Particle Universe: deep-space theme matching the renderer's palette. */
+:root {
+  --bg: #03040a;
+  --ink: #e8ecff;
+  --ink-dim: #8e98c4;
+  --glass: rgba(14, 19, 44, 0.72);
+  --edge: rgba(150, 165, 255, 0.18);
+  --cyan: #5ee7ff;
+  --pink: #f472b6;
+  --violet: #7c3aed;
+  --font: "Avenir Next", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+  font-family: var(--font); -webkit-tap-highlight-color: transparent; }
+
+#universe { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+
+.hud, .hint, .dock, .panel { position: fixed; z-index: 2; }
+
+/* --- Heads-up display --------------------------------------------------- */
+.hud { top: calc(14px + var(--safe-t)); left: 16px; pointer-events: none; }
+.hud h1 { margin: 0 0 6px; font-size: 1.15rem; font-weight: 650; letter-spacing: 0.02em; }
+.stats { display: flex; gap: 16px; margin: 0; font-size: 0.78rem; color: var(--ink-dim); }
+.stats dt { display: inline; margin-right: 5px; }
+.stats dd { display: inline; margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; }
+#statStatus.is-paused { color: var(--pink); }
+
+.hint { left: 50%; bottom: calc(82px + var(--safe-b)); transform: translateX(-50%); margin: 0;
+  width: max-content; max-width: calc(100vw - 32px); text-align: center;
+  font-size: 0.85rem; color: var(--ink-dim); pointer-events: none; text-shadow: 0 1px 6px #000; }
+
+/* --- Dock ---------------------------------------------------------------- */
+.dock { left: 50%; bottom: calc(14px + var(--safe-b)); transform: translateX(-50%);
+  display: flex; gap: 10px; padding: 8px; max-width: calc(100vw - 16px);
+  background: var(--glass); border: 1px solid var(--edge); border-radius: 18px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.group { display: flex; gap: 4px; }
+.group + .group { padding-left: 10px; border-left: 1px solid var(--edge); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-width: 44px; height: 44px; padding: 0 12px; font: inherit; font-size: 0.88rem; color: var(--ink);
+  background: transparent; border: 1px solid transparent; border-radius: 12px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s; }
+.btn:hover { background: rgba(150, 165, 255, 0.12); }
+.btn:active { background: rgba(150, 165, 255, 0.22); }
+.btn:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.btn.is-on { color: var(--pink); border-color: rgba(244, 114, 182, 0.4); }
+.tool[aria-pressed="true"] { color: var(--cyan); background: rgba(94, 231, 255, 0.12); border-color: rgba(94, 231, 255, 0.4); }
+.tool[data-tool="repel"][aria-pressed="true"] { color: var(--pink); background: rgba(244, 114, 182, 0.12); border-color: rgba(244, 114, 182, 0.4); }
+
+.ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
+#pauseBtn .ic { fill: none; }
+
+/* --- Settings panel ------------------------------------------------------ */
+.panel { top: calc(14px + var(--safe-t)); right: 14px; width: 292px; max-height: calc(100dvh - 110px - var(--safe-b));
+  overflow-y: auto; padding: 16px 18px; background: var(--glass); border: 1px solid var(--edge);
+  border-radius: 18px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  opacity: 0; visibility: hidden; transform: translateX(16px);
+  transition: opacity 0.18s, transform 0.18s, visibility 0s 0.18s; }
+.panel.open { opacity: 1; visibility: visible; transform: none; transition: opacity 0.18s, transform 0.18s; }
+
+.row { display: grid; grid-template-columns: 1fr auto; align-items: center; row-gap: 6px; margin-bottom: 16px; }
+.name { font-size: 0.88rem; }
+output { font-size: 0.82rem; color: var(--cyan); font-variant-numeric: tabular-nums; }
+.row input { grid-column: 1 / -1; }
+
+input[type="range"] { --fill: 50%; -webkit-appearance: none; appearance: none; width: 100%; height: 28px;
+  margin: 0; background: transparent; cursor: pointer; touch-action: pan-y; }
+input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--violet) var(--fill), rgba(150, 165, 255, 0.2) var(--fill)); }
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: rgba(150, 165, 255, 0.2); }
+input[type="range"]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--violet); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px;
+  border-radius: 50%; background: var(--cyan); border: 0; box-shadow: 0 0 10px rgba(94, 231, 255, 0.6); }
+input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--cyan);
+  border: 0; box-shadow: 0 0 10px rgba(94, 231, 255, 0.6); }
+
+.switches { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.switch { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 0.88rem; cursor: pointer; }
+.switch input { width: 18px; height: 18px; accent-color: var(--cyan); margin: 0; }
+.keys { margin: 12px 0 0; font-size: 0.75rem; line-height: 1.5; color: var(--ink-dim); }
+
+/* --- Wide screens: put the dock at the top so the floor (where particles pile up) stays clear --- */
+@media (min-width: 900px) {
+  .dock { bottom: auto; top: calc(14px + var(--safe-t)); }
+  .panel { top: calc(78px + var(--safe-t)); max-height: calc(100dvh - 100px - var(--safe-t)); }
+  .hint { bottom: 18px; }
+}
+
+/* --- Small screens ------------------------------------------------------- */
+@media (max-width: 640px) {
+  .lbl { display: none; }
+  .btn { padding: 0; width: 44px; }
+  .dock { gap: 6px; padding: 6px; }
+  .group + .group { padding-left: 6px; }
+  .hud { left: 12px; }
+  .stats { gap: 12px; }
+  .hint { bottom: calc(76px + var(--safe-b)); font-size: 0.8rem; }
+  .panel { top: auto; right: 8px; left: 8px; width: auto; bottom: calc(76px + var(--safe-b));
+    max-height: 52dvh; transform: translateY(16px); }
+  .keys { display: none; }
+  .panel-open .hint { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel, .btn { transition: none; }
+}
+</style>
+
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-spawn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></symbol>
+      <symbol id="i-attract" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2"/><path d="M4 4l5 5M20 4l-5 5M4 20l5-5M20 20l-5-5"/></symbol>
+      <symbol id="i-repel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2"/><path d="M9 9L3.5 3.5M15 9l5.5-5.5M9 15l-5.5 5.5M15 15l5.5 5.5"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5"/></symbol>
+      <symbol id="i-clear" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+    </defs>
+  </svg>
+
+  <canvas id="universe" aria-label="Particle simulation. Click or drag to interact."></canvas>
+
+  <header class="hud">
+    <h1>Particle Universe</h1>
+    <dl class="stats">
+      <div><dt>Particles</dt><dd id="statCount">0</dd></div>
+      <div><dt>FPS</dt><dd id="statFps">60</dd></div>
+      <div><dt>State</dt><dd id="statStatus">Running</dd></div>
+    </dl>
+  </header>
+
+  <p id="hint" class="hint" aria-live="polite"></p>
+
+  <nav class="dock" aria-label="Controls">
+    <div class="group" role="group" aria-label="Pointer tool">
+      <button type="button" class="btn tool" data-tool="spawn" aria-pressed="true" title="Spawn (1)">
+        <svg class="ic"><use href="#i-spawn"/></svg><span class="lbl">Spawn</span></button>
+      <button type="button" class="btn tool" data-tool="attract" aria-pressed="false" title="Attract (2)">
+        <svg class="ic"><use href="#i-attract"/></svg><span class="lbl">Attract</span></button>
+      <button type="button" class="btn tool" data-tool="repel" aria-pressed="false" title="Repel (3)">
+        <svg class="ic"><use href="#i-repel"/></svg><span class="lbl">Repel</span></button>
+    </div>
+    <div class="group">
+      <button type="button" class="btn" id="pauseBtn" title="Pause / resume (Space)">
+        <svg class="ic"><use id="pauseIcon" href="#i-pause"/></svg><span class="lbl" id="pauseLabel">Pause</span></button>
+      <button type="button" class="btn" id="resetBtn" title="Reset (R)">
+        <svg class="ic"><use href="#i-reset"/></svg><span class="lbl">Reset</span></button>
+      <button type="button" class="btn" id="clearBtn" title="Clear (C)">
+        <svg class="ic"><use href="#i-clear"/></svg><span class="lbl">Clear</span></button>
+      <button type="button" class="btn" id="settingsBtn" aria-expanded="false" aria-controls="panel" title="Settings">
+        <svg class="ic"><use href="#i-settings"/></svg><span class="lbl">Settings</span></button>
+    </div>
+  </nav>
+
+  <aside id="panel" class="panel" aria-label="Settings">
+    <label class="row"><span class="name">Gravity</span><output id="gravityOut" for="gravity"></output>
+      <input type="range" id="gravity" min="-1" max="3" step="0.05" value="1"></label>
+    <label class="row"><span class="name">Bounciness</span><output id="bounceOut" for="bounce"></output>
+      <input type="range" id="bounce" min="0" max="1" step="0.01" value="0.75"></label>
+    <label class="row"><span class="name">Particles</span><output id="countOut" for="count"></output>
+      <input type="range" id="count" min="0" max="1500" step="1" value="200"></label>
+    <label class="row"><span class="name">Pointer force</span><output id="forceOut" for="force"></output>
+      <input type="range" id="force" min="0" max="12" step="0.1" value="4.5"></label>
+    <label class="row"><span class="name">Pointer reach</span><output id="radiusOut" for="radius"></output>
+      <input type="range" id="radius" min="60" max="400" step="1" value="180"></label>
+    <div class="switches">
+      <label class="switch"><input type="checkbox" id="collisions" checked><span>Collisions</span></label>
+      <label class="switch"><input type="checkbox" id="trails" checked><span>Motion trails</span></label>
+    </div>
+    <p class="keys">Keys: 1 2 3 switch tool, Space pause, R reset, C clear</p>
+  </aside>
+<script>
+/**
+ * config.js
+ * ---------------------------------------------------------------------------
+ * Every tunable number in the simulation lives here. Changing a value and
+ * refreshing the page is the fastest way to build intuition for what it does.
+ *
+ * UNITS
+ *   Positions are CSS pixels and time is in seconds, so speeds are px/s and
+ *   accelerations are px/s². We pretend 1 px = 1 cm, which makes Earth gravity
+ *   (9.8 m/s²) equal to 980 px/s². That is what the constant G below means.
+ */
+const CONFIG = {
+  G: 980, // one "g", in px/s²
+
+  // --- Time stepping -------------------------------------------------------
+  maxFrameTime: 1 / 30,   // longest frame we simulate (protects against lag spikes / tab switches)
+  maxSubstep: 1 / 120,    // each physics step is at most this long; a frame is split into equal steps
+  collisionIterations: 2, // how many times per step we sweep over colliding pairs (more = stiffer piles)
+
+  // --- Particles -----------------------------------------------------------
+  radius: { min: 4, max: 9 },     // px. Mass is derived from radius (see Particle)
+  hue: { min: 190, max: 290 },    // base colour range (blue -> violet)
+  maxSpeed: 2400,                 // px/s hard cap; stops particles tunnelling through each other
+  referenceMass: 44,              // ~ average particle mass (mean of r²); pointer force is scaled against it
+
+  // --- Forces & damping ----------------------------------------------------
+  drag: 0.12,             // air resistance, per second. v(t) = v0 * e^(-drag * t)
+  wallFriction: 2.5,      // per second; tangential slowdown while touching a wall
+  restSpeed: 28,          // px/s; wall impacts slower than this don't bounce (lets particles come to rest)
+  pairRestSpeed: 90,      // px/s; particle-vs-particle impacts slower than this don't bounce (lets piles settle)
+  settleDamping: 30,      // per second; extra damping on SLOW particles that are touching others (calms piles)
+  settleSpeed: 160,       // px/s; particles faster than this are never settle-damped
+  correction: 0.8,        // fraction of a particle overlap fixed per pass (1 = all at once; lower = softer)
+  slop: 0.01,             // px of overlap we tolerate, so resting contacts don't flicker
+  pointerSoftening: 14,   // px; avoids a singularity when a particle sits exactly on the pointer
+  pointerDamping: 2.2,    // per second; extra "thick air" near the pointer in Attract mode so particles gather
+
+  // --- Spawning ------------------------------------------------------------
+  spawn: {
+    burst: 8,           // particles created on the initial click
+    rate: 45,           // particles per second while the button is held
+    minSpeed: 40,       // px/s, random spread
+    maxSpeed: 260,
+    flingFactor: 0.35,  // how much of the pointer's own velocity new particles inherit
+  },
+
+  // --- Rendering -----------------------------------------------------------
+  render: {
+    colorSpeed: 900,    // px/s at which a particle reaches its "hottest" colour
+    hueShift: 80,       // degrees of hue shift from slow to fast
+    trailSeconds: 0.03, // motion streak length = velocity * this
+    maxTrail: 46,       // px
+    minTrailSpeed: 50,  // px/s; slower particles don't get a streak
+  },
+
+  // --- Starting values for the UI controls ----------------------------------
+  defaults: {
+    gravityG: 1,        // multiples of G
+    restitution: 0.75,  // bounciness: 0 = clay, 1 = perfectly elastic
+    pointerForceG: 4.5, // multiples of G
+    pointerRadius: 180, // px
+    collisions: true,
+    trails: true,
+  },
+
+  // Phones get a smaller particle budget so they stay smooth.
+  limits: {
+    desktop: { maxParticles: 1500, initialCount: 200 },
+    mobile: { maxParticles: 700, initialCount: 90 },
+  },
+};
+
+// Small shared helpers --------------------------------------------------------
+function clamp(value, lo, hi) {
+  return value < lo ? lo : value > hi ? hi : value;
+}
+
+function rand(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+</script>
+<script>
+/**
+ * particle.js
+ * ---------------------------------------------------------------------------
+ * A Particle is a disc with a position, a velocity and a mass. It knows how to
+ * move itself, but it knows nothing about walls, gravity or other particles;
+ * that is the PhysicsWorld's job. Keeping the two apart is what makes the code
+ * easy to extend (new particle types, new forces) without a tangle.
+ */
+class Particle {
+  constructor(x, y, radius, hue) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.radius = radius;
+
+    // In 2D, "mass proportional to area" (density = 1) means mass ~ radius².
+    // We also store 1/mass because the physics only ever divides by mass, and
+    // multiplying is cheaper. A wall would simply have invMass = 0 ("infinite" mass).
+    this.mass = radius * radius;
+    this.invMass = 1 / this.mass;
+
+    this.hue = hue; // base colour; the renderer shifts it with speed
+  }
+
+  /**
+   * Semi-implicit (symplectic) Euler integration:
+   *     v <- v + a * dt      (update velocity first...)
+   *     x <- x + v * dt      (...then move using the NEW velocity)
+   * Updating velocity before position is what makes this noticeably more stable
+   * than the "textbook" explicit Euler, and it costs nothing extra.
+   */
+  integrate(ax, ay, dt) {
+    this.vx += ax * dt;
+    this.vy += ay * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+  }
+
+  scaleVelocity(factor) {
+    this.vx *= factor;
+    this.vy *= factor;
+  }
+
+  limitSpeed(max) {
+    const speedSq = this.vx * this.vx + this.vy * this.vy;
+    if (speedSq > max * max) {
+      const k = max / Math.sqrt(speedSq);
+      this.vx *= k;
+      this.vy *= k;
+    }
+  }
+}
+
+</script>
+<script>
+/**
+ * spatial-grid.js
+ * ---------------------------------------------------------------------------
+ * Collision detection "broad phase".
+ *
+ * Checking every particle against every other one costs N² comparisons: with
+ * 1500 particles that is over a million checks per step. But two particles can
+ * only touch if they are close, so we sort particles into a uniform grid of
+ * square cells and only compare particles that share a cell or sit in
+ * neighbouring cells. That makes the cost roughly proportional to N.
+ *
+ * The cell size must be >= the largest possible particle DIAMETER. Then any two
+ * touching particles are guaranteed to be in the same or adjacent cells.
+ *
+ * Implementation note: instead of an array-of-arrays (which allocates garbage
+ * every frame) each cell stores a linked list in two flat typed arrays:
+ *     heads[cell]  -> index of the first particle in that cell (or -1)
+ *     next[i]      -> index of the next particle in the same cell (or -1)
+ */
+class SpatialGrid {
+  constructor(cellSize) {
+    this.cellSize = cellSize;
+    this.cols = 1;
+    this.rows = 1;
+    this.heads = new Int32Array(1);
+    this.next = new Int32Array(0);
+  }
+
+  resize(width, height) {
+    this.cols = Math.max(1, Math.ceil(width / this.cellSize));
+    this.rows = Math.max(1, Math.ceil(height / this.cellSize));
+    this.heads = new Int32Array(this.cols * this.rows);
+  }
+
+  /** Re-sort every particle into its cell. Called once per physics step. */
+  build(particles) {
+    const n = particles.length;
+    if (this.next.length < n) {
+      this.next = new Int32Array(Math.max(n, this.next.length * 2));
+    }
+    const { cellSize, cols, rows, heads, next } = this;
+    heads.fill(-1);
+
+    for (let i = 0; i < n; i++) {
+      const p = particles[i];
+      let cx = (p.x / cellSize) | 0; // "| 0" truncates to an integer (and turns NaN into 0)
+      let cy = (p.y / cellSize) | 0;
+      if (cx < 0) cx = 0; else if (cx >= cols) cx = cols - 1;
+      if (cy < 0) cy = 0; else if (cy >= rows) cy = rows - 1;
+
+      const cell = cy * cols + cx;
+      next[i] = heads[cell]; // push particle i onto the front of the cell's list
+      heads[cell] = i;
+    }
+  }
+
+  /**
+   * Call callback(i, j) once for every pair of particles that might be touching.
+   *
+   * To avoid reporting a pair twice we only look at the particles AFTER i in the
+   * same cell, plus four of the eight neighbouring cells (east plus the three
+   * cells on one side). The other four neighbours see the pair from their side.
+   *
+   * ORDER MATTERS to the collision solver. If pairs are visited starting at the
+   * floor and working upward (bottomUp = true), the floor's "I can't move down"
+   * information ripples up through a whole stack in a single sweep, so piles
+   * settle quickly instead of slowly sagging and jittering.
+   */
+  forEachPair(callback, bottomUp = false) {
+    const { cols, rows, heads, next } = this;
+    const dyList = bottomUp ? NEIGHBOR_DY_UP : NEIGHBOR_DY_DOWN;
+    const yStart = bottomUp ? rows - 1 : 0;
+    const yStep = bottomUp ? -1 : 1;
+
+    for (let row = 0; row < rows; row++) {
+      const cy = yStart + row * yStep;
+      for (let cx = 0; cx < cols; cx++) {
+        for (let i = heads[cy * cols + cx]; i !== -1; i = next[i]) {
+          // Same cell
+          for (let j = next[i]; j !== -1; j = next[j]) callback(i, j);
+
+          // Half of the neighbouring cells
+          for (let k = 0; k < 4; k++) {
+            const nx = cx + NEIGHBOR_DX[k];
+            const ny = cy + dyList[k];
+            if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
+            for (let j = heads[ny * cols + nx]; j !== -1; j = next[j]) callback(i, j);
+          }
+        }
+      }
+    }
+  }
+}
+
+// East, then the three cells below (top-down sweep) or above (bottom-up sweep)
+const NEIGHBOR_DX = [1, -1, 0, 1];
+const NEIGHBOR_DY_DOWN = [0, 1, 1, 1];
+const NEIGHBOR_DY_UP = [0, -1, -1, -1];
+
+</script>
+<script>
+/**
+ * physics-world.js
+ * ---------------------------------------------------------------------------
+ * PhysicsWorld owns all particles and advances them through time. It has no
+ * idea the canvas, the mouse or the DOM exist; it only receives numbers (the
+ * world size, the pointer position, the settings) and updates particle state.
+ * That separation means you could run it headless (e.g. in a unit test).
+ *
+ * One physics step does, in order:
+ *   1. forces      gravity + pointer force (+ drag)      -> acceleration
+ *   2. integrate   acceleration -> velocity -> position
+ *   3. walls       genuine impacts bounce (restitution) and slide (friction)
+ *   4. collisions  particle vs particle (impulses), with the walls acting as
+ *                  a hard, non-bouncy constraint so piles can rest on the floor
+ */
+class PhysicsWorld {
+  constructor(width, height, maxParticles) {
+    this.width = width;
+    this.height = height;
+    this.maxParticles = maxParticles;
+    this.particles = [];
+    this.settings = PhysicsWorld.defaultSettings();
+
+    // Written by the app every frame. mode: 'off' | 'attract' | 'repel'
+    this.pointer = { x: 0, y: 0, mode: 'off' };
+
+    this.grid = new SpatialGrid(CONFIG.radius.max * 2);
+    this.grid.resize(width, height);
+
+    // How many neighbours each particle touched this step (used for settle damping).
+    this.contacts = new Uint8Array(0);
+    this._countContacts = false;
+
+    // Seconds during which settle damping is suspended (set when gravity changes).
+    this.wake = 0;
+
+    // Created once so we don't allocate a new closure every step.
+    this._collidePair = (i, j) => {
+      const a = this.particles[i];
+      const b = this.particles[j];
+      const touching = this.resolveCollision(a, b);
+      if (touching && this._countContacts) {
+        // Only SUPPORTED particles count as "in a pile": the one that has a
+        // neighbour on the support side (below it, when gravity points down) at
+        // a mostly-vertical angle. Two particles drifting side by side in mid-air
+        // are not supported, so they keep free-falling instead of hanging there.
+        const gs = this.settings.gravity;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        if (dy * gs > 0 && dy * dy > 0.25 * (dx * dx + dy * dy)) this.contacts[i]++;
+        else if (dy * gs < 0 && dy * dy > 0.25 * (dx * dx + dy * dy)) this.contacts[j]++;
+      }
+    };
+  }
+
+  static defaultSettings() {
+    const d = CONFIG.defaults;
+    return {
+      gravity: d.gravityG * CONFIG.G,           // px/s², positive = down the screen
+      restitution: d.restitution,               // bounciness, 0..1
+      pointerStrength: d.pointerForceG * CONFIG.G,
+      pointerRadius: d.pointerRadius,
+      collisions: d.collisions,
+    };
+  }
+
+  /**
+   * Velocity after bouncing off a wall. `v` is the velocity component pointing
+   * INTO the wall. Flip it and scale by the coefficient of restitution e.
+   * Very slow impacts are treated as "resting contact" and don't bounce at all;
+   * without that rule, particles would jitter forever on the floor.
+   */
+  static reflect(v, restitution) {
+    return Math.abs(v) < CONFIG.restSpeed ? 0 : -v * restitution;
+  }
+
+  get count() {
+    return this.particles.length;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Managing particles
+  // ---------------------------------------------------------------------------
+
+  resize(width, height) {
+    this.width = width;
+    this.height = height;
+    this.grid.resize(width, height);
+    for (const p of this.particles) {
+      p.x = clamp(p.x, p.radius, width - p.radius);
+      p.y = clamp(p.y, p.radius, height - p.radius);
+    }
+  }
+
+  addParticle(x, y, vx = 0, vy = 0) {
+    if (this.particles.length >= this.maxParticles) this.particles.shift(); // recycle the oldest
+
+    const radius = rand(CONFIG.radius.min, CONFIG.radius.max);
+    const p = new Particle(
+      clamp(x, radius, this.width - radius),
+      clamp(y, radius, this.height - radius),
+      radius,
+      rand(CONFIG.hue.min, CONFIG.hue.max)
+    );
+    p.vx = vx;
+    p.vy = vy;
+    this.particles.push(p);
+    return p;
+  }
+
+  /** Add or remove particles until exactly `target` exist. */
+  setCount(target) {
+    target = clamp(Math.round(target), 0, this.maxParticles);
+    while (this.particles.length > target) this.particles.pop();
+    while (this.particles.length < target) {
+      this.addParticle(
+        rand(0, this.width), rand(0, this.height * 0.65),
+        rand(-80, 80), rand(-80, 80)
+      );
+    }
+  }
+
+  clear() {
+    this.particles.length = 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Time stepping
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Advance the simulation by one animation frame (`frameDt` seconds).
+   *
+   * We split the frame into equal sub-steps no longer than CONFIG.maxSubstep.
+   * Small steps make fast particles less likely to tunnel through each other
+   * and make piles much more stable. The frame time is clamped so that a lag
+   * spike (or returning to a background tab) can't inject one enormous step.
+   */
+  update(frameDt) {
+    const dt = Math.min(frameDt, CONFIG.maxFrameTime);
+    if (!(dt > 0)) return;
+    const steps = Math.ceil(dt / CONFIG.maxSubstep);
+    const h = dt / steps;
+    this.wake = Math.max(0, this.wake - dt);
+    for (let i = 0; i < steps; i++) this.step(h);
+  }
+
+  step(h) {
+    const s = this.settings;
+    const ps = this.particles;
+    const ptr = this.pointer;
+
+    // Frame-rate independent air drag. The ODE dv/dt = -k*v has the exact
+    // solution v(t) = v0 * e^(-k*t), so over a step of length h we multiply
+    // the velocity by e^(-k*h). (Doing "v *= 0.99" each step would damp more
+    // at higher frame rates.)
+    const drag = Math.exp(-CONFIG.drag * h);
+
+    const pointerOn = ptr.mode !== 'off';
+    const attract = ptr.mode === 'attract';
+    const sign = attract ? 1 : -1;
+    const R = s.pointerRadius;
+    const R2 = R * R;
+    const soft = CONFIG.pointerSoftening;
+
+    for (let i = 0; i < ps.length; i++) {
+      const p = ps[i];
+
+      // 1. FORCES -> ACCELERATION --------------------------------------------
+      // Gravity is an acceleration, so it is the same for every particle
+      // (heavy and light things fall together).
+      let ax = 0;
+      let ay = s.gravity;
+      let extraDrag = 1;
+
+      if (pointerOn) {
+        const dx = ptr.x - p.x;
+        const dy = ptr.y - p.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < R2) {
+          const d = Math.sqrt(d2);
+          const falloff = 1 - d / R; // 1 at the pointer, 0 at the edge of its reach
+
+          // Newton's second law: a = F / m. Here the "force" is scaled against
+          // a reference mass, so big particles accelerate less than small ones.
+          const accel = sign * s.pointerStrength * falloff * CONFIG.referenceMass * p.invMass;
+
+          // (dx, dy) / (d + soft) is a direction vector that shrinks to zero
+          // right at the pointer, so particles don't jitter around the centre.
+          const k = accel / (d + soft);
+          ax += dx * k;
+          ay += dy * k;
+
+          if (attract) extraDrag = Math.exp(-CONFIG.pointerDamping * falloff * h);
+        }
+      }
+
+      // 2. INTEGRATE ------------------------------------------------------------
+      p.integrate(ax, ay, h);
+      p.scaleVelocity(drag * extraDrag);
+      p.limitSpeed(CONFIG.maxSpeed);
+    }
+
+    // 3. WALL BOUNCES -------------------------------------------------------------
+    // This is where a ball dropped on the floor actually bounces.
+    for (let i = 0; i < ps.length; i++) this.collideWithWalls(ps[i], h);
+
+    // 4. PARTICLE-PARTICLE COLLISIONS ---------------------------------------------
+    if (s.collisions && ps.length > 1) {
+      this.grid.build(ps);
+      if (this.contacts.length < ps.length) this.contacts = new Uint8Array(ps.length * 2);
+      this.contacts.fill(0, 0, ps.length);
+
+      // Sweep from the "supporting" wall outward: the floor when gravity points
+      // down, the ceiling when it is flipped.
+      const bottomUp = s.gravity >= 0;
+
+      for (let iter = 0; iter < CONFIG.collisionIterations; iter++) {
+        this._countContacts = iter === 0; // count each contact once, not once per iteration
+        // Walls go INSIDE the iteration loop. If we only applied them at the end,
+        // the weight of a pile would push the bottom layer into the floor and
+        // nothing above it could settle, because the floor's "no more downward
+        // motion" rule would arrive only after the solver had finished.
+        for (let i = 0; i < ps.length; i++) this.constrainToWalls(ps[i]);
+        this.grid.forEachPair(this._collidePair, bottomUp);
+      }
+      for (let i = 0; i < ps.length; i++) this.constrainToWalls(ps[i]);
+
+      // Settle damping. A pile of soft, overlapping discs under gravity never
+      // quite comes to rest on its own: it keeps creeping and shimmering. Real
+      // engines fix this by damping slow bodies that are in contact ("sleeping").
+      // Fast particles (flung, falling, bouncing) are not affected at all.
+      const settle = Math.exp(-CONFIG.settleDamping * h);
+      const settleSq = CONFIG.settleSpeed * CONFIG.settleSpeed;
+      for (let i = 0; i < ps.length && this.wake <= 0; i++) {
+        if (this.contacts[i] === 0) continue;
+        const p = ps[i];
+        if (p.vx * p.vx + p.vy * p.vy < settleSq) p.scaleVelocity(settle);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Collisions
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Circle vs circle. Two parts:
+   *   A. Positional correction: if the discs overlap, push them apart along the
+   *      line joining their centres (lighter one moves more).
+   *   B. Impulse: if they are moving toward each other, change their velocities
+   *      so they bounce, conserving momentum.
+   */
+  resolveCollision(a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const minDist = a.radius + b.radius;
+    const distSq = dx * dx + dy * dy;
+    if (distSq >= minDist * minDist) return false; // not touching
+
+    let dist = Math.sqrt(distSq);
+    let nx;
+    let ny; // collision normal: unit vector from a to b
+    if (dist < 1e-6) {
+      const angle = Math.random() * Math.PI * 2; // exactly on top of each other: pick any direction
+      nx = Math.cos(angle);
+      ny = Math.sin(angle);
+      dist = 0;
+    } else {
+      nx = dx / dist;
+      ny = dy / dist;
+    }
+
+    const invMassSum = a.invMass + b.invMass;
+
+    // A. Positional correction. Only fix 80% of the overlap (and ignore tiny
+    //    overlaps) so stacks don't vibrate from over-correcting.
+    const overlap = minDist - dist;
+    const correction = (Math.max(overlap - CONFIG.slop, 0) * CONFIG.correction) / invMassSum;
+    a.x -= nx * correction * a.invMass;
+    a.y -= ny * correction * a.invMass;
+    b.x += nx * correction * b.invMass;
+    b.y += ny * correction * b.invMass;
+
+    // B. Impulse. vn is the relative velocity along the normal; negative
+    //    means the particles are approaching each other.
+    const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+    if (vn >= 0) return true; // already separating
+
+    // Slow impacts are "resting contact" and must not bounce, or piles never settle.
+    const e = -vn < CONFIG.pairRestSpeed ? 0 : this.settings.restitution;
+
+    // We want the normal velocity afterwards to be -e * vn. Applying an equal
+    // and opposite impulse J along the normal changes vn by J * (1/ma + 1/mb),
+    // so solving  vn + J*(invMassSum) = -e*vn  gives:
+    const J = (-(1 + e) * vn) / invMassSum;
+    a.vx -= J * nx * a.invMass;
+    a.vy -= J * ny * a.invMass;
+    b.vx += J * nx * b.invMass;
+    b.vy += J * ny * b.invMass;
+    return true;
+  }
+
+  /**
+   * Walls as a hard constraint: stay inside the box and have no velocity
+   * pointing into a wall. No bounce and no friction; that is collideWithWalls().
+   */
+  constrainToWalls(p) {
+    const r = p.radius;
+    if (p.x <= r) { p.x = r; if (p.vx < 0) p.vx = 0; }
+    else if (p.x >= this.width - r) { p.x = this.width - r; if (p.vx > 0) p.vx = 0; }
+
+    if (p.y <= r) { p.y = r; if (p.vy < 0) p.vy = 0; }
+    else if (p.y >= this.height - r) { p.y = this.height - r; if (p.vy > 0) p.vy = 0; }
+  }
+
+  /** Wall impacts: bounce with restitution, slow down tangentially (friction). */
+  collideWithWalls(p, h) {
+    const e = this.settings.restitution;
+    const r = p.radius;
+    const grip = Math.exp(-CONFIG.wallFriction * h); // sliding friction while touching
+
+    if (p.x < r) {
+      p.x = r;
+      if (p.vx < 0) p.vx = PhysicsWorld.reflect(p.vx, e);
+      p.vy *= grip;
+    } else if (p.x > this.width - r) {
+      p.x = this.width - r;
+      if (p.vx > 0) p.vx = PhysicsWorld.reflect(p.vx, e);
+      p.vy *= grip;
+    }
+
+    if (p.y < r) {
+      p.y = r;
+      if (p.vy < 0) p.vy = PhysicsWorld.reflect(p.vy, e);
+      p.vx *= grip;
+    } else if (p.y > this.height - r) {
+      p.y = this.height - r;
+      if (p.vy > 0) p.vy = PhysicsWorld.reflect(p.vy, e);
+      p.vx *= grip;
+    }
+  }
+}
+
+</script>
+<script>
+/**
+ * renderer.js
+ * ---------------------------------------------------------------------------
+ * Draws the world onto the <canvas>. It only READS the physics state; it never
+ * changes it. (That is why you can pause the physics and still render.)
+ *
+ * Performance notes, since drawing is usually the bottleneck:
+ *   - The background and stars are painted ONCE into an off-screen canvas, then
+ *     copied to the screen each frame with a single drawImage call.
+ *   - Each particle's glow is a pre-rendered "sprite" (a small radial-gradient
+ *     image), one per hue bucket. Drawing a sprite is far cheaper than building
+ *     a gradient per particle per frame.
+ *   - Particles are drawn with the 'lighter' blend mode, which ADDS colours, so
+ *     overlapping glows brighten like light. That is the neon look.
+ */
+
+const HUE_STEP = 10;                    // degrees between pre-rendered sprites
+const HUE_BUCKETS = 360 / HUE_STEP;
+const SPRITE_SIZE = 64;                 // px; the sprite's bright core fills ~46% of its radius
+
+class Renderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    // alpha:false tells the browser the canvas is opaque, which lets it skip blending work.
+    this.ctx = canvas.getContext('2d', { alpha: false });
+    this.trails = CONFIG.defaults.trails;
+
+    this.width = 0;
+    this.height = 0;
+    this.dpr = 1;
+    this.backdrop = document.createElement('canvas');
+
+    this.sprites = [];
+    this.trailStyles = [];
+    for (let b = 0; b < HUE_BUCKETS; b++) {
+      const hue = b * HUE_STEP;
+      this.sprites.push(Renderer.makeGlowSprite(hue));
+      this.trailStyles.push(`hsla(${hue}, 100%, 62%, 0.30)`);
+    }
+  }
+
+  /** A soft glowing disc: bright centre, a defined edge at ~46% of the radius, then a fading halo. */
+  static makeGlowSprite(hue) {
+    const c = document.createElement('canvas');
+    c.width = c.height = SPRITE_SIZE;
+    const g = c.getContext('2d');
+    const m = SPRITE_SIZE / 2;
+    const grad = g.createRadialGradient(m, m, 0, m, m, m);
+    grad.addColorStop(0.0, `hsla(${hue}, 100%, 92%, 1)`);
+    grad.addColorStop(0.22, `hsla(${hue}, 100%, 70%, 0.95)`);
+    grad.addColorStop(0.44, `hsla(${hue}, 100%, 58%, 0.80)`);
+    grad.addColorStop(0.5, `hsla(${hue}, 100%, 55%, 0.30)`);
+    grad.addColorStop(0.72, `hsla(${hue}, 100%, 52%, 0.08)`);
+    grad.addColorStop(1.0, `hsla(${hue}, 100%, 50%, 0)`);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
+    return c;
+  }
+
+  /**
+   * Match the canvas to the window. The canvas has TWO sizes: its CSS size
+   * (layout, in CSS pixels) and its drawing-buffer size (real device pixels).
+   * On a 2x "retina" screen we make the buffer twice as large and scale the
+   * context, so everything stays sharp while we keep thinking in CSS pixels.
+   */
+  resize(width, height) {
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2); // cap at 2x to protect performance
+    this.width = width;
+    this.height = height;
+
+    const pw = Math.round(width * this.dpr);
+    const ph = Math.round(height * this.dpr);
+    this.canvas.width = pw;   // (changing width/height also resets the context state...)
+    this.canvas.height = ph;
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); // ...so set the scale afterwards
+
+    this.paintBackdrop(pw, ph);
+  }
+
+  paintBackdrop(pw, ph) {
+    const w = this.width;
+    const h = this.height;
+    const c = this.backdrop;
+    c.width = pw;
+    c.height = ph;
+    const g = c.getContext('2d');
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+    // Deep-space base
+    const base = g.createRadialGradient(w * 0.5, h * 0.35, 0, w * 0.5, h * 0.35, Math.max(w, h) * 0.9);
+    base.addColorStop(0, '#111936');
+    base.addColorStop(0.5, '#090d1f');
+    base.addColorStop(1, '#03040a');
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+
+    // Two faint colour clouds
+    const cloud = (cx, cy, radius, rgb, alpha) => {
+      const grad = g.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, `rgba(${rgb}, ${alpha})`);
+      grad.addColorStop(1, `rgba(${rgb}, 0)`);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, w, h);
+    };
+    cloud(w * 0.18, h * 0.82, Math.max(w, h) * 0.55, '124, 58, 237', 0.10);
+    cloud(w * 0.86, h * 0.18, Math.max(w, h) * 0.45, '34, 211, 238', 0.07);
+
+    // Stars
+    const stars = clamp(Math.round((w * h) / 7000), 40, 260);
+    for (let i = 0; i < stars; i++) {
+      g.fillStyle = `rgba(200, 215, 255, ${rand(0.12, 0.6).toFixed(2)})`;
+      const size = rand(0.6, 1.6);
+      g.fillRect(rand(0, w), rand(0, h), size, size);
+    }
+  }
+
+  render(world, input, tool, time) {
+    const ctx = this.ctx;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(this.backdrop, 0, 0, this.width, this.height);
+
+    this.drawParticles(world.particles);
+
+    ctx.globalCompositeOperation = 'source-over';
+    this.drawPointer(input, tool, world.settings.pointerRadius, time);
+  }
+
+  drawParticles(particles) {
+    const ctx = this.ctx;
+    const R = CONFIG.render;
+    ctx.globalCompositeOperation = 'lighter'; // additive blending: overlapping glows add up
+    ctx.lineCap = 'round';
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+
+      // Colour encodes speed: a particle starts at its own base hue and drifts
+      // toward warm colours as it speeds up (a visual cue for kinetic energy).
+      const heat = Math.min(speed / R.colorSpeed, 1);
+      const hue = (p.hue + heat * R.hueShift) % 360;
+      const bucket = Math.floor(hue / HUE_STEP) % HUE_BUCKETS;
+
+      // Motion streak: a line from the particle back along its velocity.
+      if (this.trails && speed > R.minTrailSpeed) {
+        const length = Math.min(speed * R.trailSeconds, R.maxTrail);
+        const k = length / speed;
+        ctx.strokeStyle = this.trailStyles[bucket];
+        ctx.lineWidth = p.radius * 1.3;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * k, p.y - p.vy * k);
+        ctx.stroke();
+      }
+
+      const size = p.radius * 4.4; // sprite is bigger than the disc so the halo has room
+      ctx.drawImage(this.sprites[bucket], p.x - size / 2, p.y - size / 2, size, size);
+    }
+  }
+
+  /** The cursor: a crosshair-ish ring for Spawn, an animated force field for Attract / Repel. */
+  drawPointer(input, tool, radius, time) {
+    if (!input.inside) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.lineWidth = 1.5;
+
+    if (tool === 'spawn') {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.beginPath();
+      ctx.arc(input.x, input.y, input.down ? 15 : 9, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      const attract = tool === 'attract';
+      const rgb = attract ? '94, 231, 255' : '244, 114, 182';
+
+      // Outline of the force radius
+      ctx.strokeStyle = `rgba(${rgb}, ${input.down ? 0.35 : 0.22})`;
+      ctx.setLineDash([5, 9]);
+      ctx.beginPath();
+      ctx.arc(input.x, input.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // While pressed: three rings flowing inward (attract) or outward (repel)
+      if (input.down) {
+        for (let k = 0; k < 3; k++) {
+          const phase = (time * 0.9 + k / 3) % 1;
+          const r = attract ? radius * (1 - phase) : radius * phase;
+          ctx.strokeStyle = `rgba(${rgb}, ${(0.55 * Math.sin(Math.PI * phase)).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(input.x, input.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      ctx.fillStyle = `rgba(${rgb}, 0.9)`;
+      ctx.beginPath();
+      ctx.arc(input.x, input.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+</script>
+<script>
+/**
+ * input.js
+ * ---------------------------------------------------------------------------
+ * InputController turns raw browser pointer events into a small, easy-to-read
+ * state object: where the pointer is, whether it is pressed, and how fast it is
+ * moving. It uses Pointer Events, so one code path handles mouse, touch and pen.
+ *
+ * It does NOT decide what a press means (spawn? attract?); the App does that.
+ * Keeping "what happened" separate from "what to do about it" is a useful habit.
+ */
+class InputController {
+  constructor(canvas) {
+    this.canvas = canvas;
+
+    this.x = 0;           // pointer position in canvas (CSS pixel) coordinates
+    this.y = 0;
+    this.vx = 0;          // smoothed pointer velocity in px/s (lets you "throw" particles)
+    this.vy = 0;
+    this.down = false;    // is the button / finger currently pressed?
+    this.inside = false;  // is the pointer over the canvas? (used to draw the cursor ring)
+    this.pressed = false; // true from the moment of the press until consumePress() is called
+
+    this.pointerId = null;
+    this.lastTime = 0;
+
+    canvas.addEventListener('pointerdown', (e) => this.onDown(e));
+    canvas.addEventListener('pointermove', (e) => this.onMove(e));
+    canvas.addEventListener('pointerup', (e) => this.onUp(e));
+    canvas.addEventListener('pointercancel', (e) => this.onUp(e));
+    canvas.addEventListener('pointerenter', (e) => {
+      if (!e.isPrimary) return;
+      this.inside = true;
+      this.track(e, true);
+    });
+    canvas.addEventListener('pointerleave', (e) => {
+      if (e.isPrimary && !this.down) this.inside = false;
+    });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  onDown(e) {
+    if (!e.isPrimary) return; // ignore a second finger
+    if (e.pointerType === 'mouse' && e.button !== 0) return; // left button only
+
+    // Capture keeps delivering events to the canvas even if the pointer
+    // leaves it while pressed (e.g. dragging past the edge of the window).
+    this.canvas.setPointerCapture(e.pointerId);
+    this.pointerId = e.pointerId;
+    this.down = true;
+    this.pressed = true;
+    this.inside = true;
+    this.track(e, true);
+  }
+
+  onMove(e) {
+    if (!e.isPrimary) return;
+    this.inside = true;
+    this.track(e, false);
+  }
+
+  onUp(e) {
+    if (e.pointerId !== this.pointerId) return;
+    this.down = false;
+    this.pointerId = null;
+    if (e.pointerType !== 'mouse') this.inside = false; // a lifted finger isn't "hovering"
+  }
+
+  /** Update position and a smoothed velocity estimate from a pointer event. */
+  track(e, reset) {
+    const rect = this.canvas.getBoundingClientRect();
+    const nx = e.clientX - rect.left;
+    const ny = e.clientY - rect.top;
+
+    if (reset) {
+      this.vx = 0;
+      this.vy = 0;
+    } else {
+      const dt = (e.timeStamp - this.lastTime) / 1000;
+      if (dt > 0.001 && dt < 0.1) {
+        // Blend the new instantaneous velocity into the old one to smooth out noise.
+        this.vx = clamp(this.vx * 0.6 + ((nx - this.x) / dt) * 0.4, -2500, 2500);
+        this.vy = clamp(this.vy * 0.6 + ((ny - this.y) / dt) * 0.4, -2500, 2500);
+      }
+    }
+
+    this.x = nx;
+    this.y = ny;
+    this.lastTime = e.timeStamp;
+  }
+
+  /** Called once per frame. Pointer events stop when the pointer stops, so fade the velocity out. */
+  update(dt) {
+    const k = Math.exp(-10 * dt);
+    this.vx *= k;
+    this.vy *= k;
+  }
+
+  /** Returns true exactly once per press. */
+  consumePress() {
+    const was = this.pressed;
+    this.pressed = false;
+    return was;
+  }
+}
+
+</script>
+<script>
+/**
+ * ui.js
+ * ---------------------------------------------------------------------------
+ * Controls wires the HTML controls (sliders, buttons, toggles, keyboard) to the
+ * App. It is the only file that touches the control panel's DOM.
+ *
+ * Sliders are described in a small table (SLIDERS below): how to display the
+ * value, and what to do with it. Adding a new slider means adding one row here
+ * plus one <input type="range"> in index.html.
+ */
+
+const byId = (id) => document.getElementById(id);
+
+const SLIDERS = {
+  gravity: {
+    format: (v) => `${v.toFixed(2)} g`,
+    apply: (app, v) => {
+      app.world.settings.gravity = v * CONFIG.G;
+      app.world.wake = 1.5; // let a resting pile start moving when gravity changes
+    },
+  },
+  bounce: {
+    format: (v) => `${Math.round(v * 100)}%`,
+    apply: (app, v) => { app.world.settings.restitution = v; },
+  },
+  count: {
+    format: (v) => `${Math.round(v)}`,
+    apply: (app, v) => app.world.setCount(Math.round(v)),
+  },
+  force: {
+    format: (v) => `${v.toFixed(1)} g`,
+    apply: (app, v) => { app.world.settings.pointerStrength = v * CONFIG.G; },
+  },
+  radius: {
+    format: (v) => `${Math.round(v)} px`,
+    apply: (app, v) => { app.world.settings.pointerRadius = v; },
+  },
+};
+
+const TOOL_HINTS = {
+  spawn: 'Click or drag to spawn particles. Flick to throw them.',
+  attract: 'Press and hold to pull particles toward the pointer.',
+  repel: 'Press and hold to push particles away.',
+};
+
+class Controls {
+  constructor(app) {
+    this.app = app;
+    this.fps = 60;
+    this.statTimer = 0;
+
+    this.panel = byId('panel');
+    this.settingsBtn = byId('settingsBtn');
+    this.pauseBtn = byId('pauseBtn');
+    this.pauseIcon = byId('pauseIcon');
+    this.pauseLabel = byId('pauseLabel');
+    this.hint = byId('hint');
+    this.statCount = byId('statCount');
+    this.statFps = byId('statFps');
+    this.statStatus = byId('statStatus');
+    this.toolButtons = Array.from(document.querySelectorAll('[data-tool]'));
+
+    byId('count').max = String(app.world.maxParticles); // phones get a lower limit
+
+    this.bindSliders();
+    this.bindToggles();
+    this.bindButtons();
+    this.bindKeyboard();
+
+    this.setPanelOpen(window.innerWidth >= 900); // open by default on big screens only
+  }
+
+  // ---------------------------------------------------------------------------
+  // Wiring
+  // ---------------------------------------------------------------------------
+
+  bindSliders() {
+    for (const id of Object.keys(SLIDERS)) {
+      const input = byId(id);
+      input.addEventListener('input', () => {
+        SLIDERS[id].apply(this.app, parseFloat(input.value));
+        this.paintSlider(id);
+      });
+    }
+  }
+
+  bindToggles() {
+    byId('collisions').addEventListener('change', (e) => {
+      this.app.world.settings.collisions = e.target.checked;
+    });
+    byId('trails').addEventListener('change', (e) => {
+      this.app.renderer.trails = e.target.checked;
+    });
+  }
+
+  bindButtons() {
+    for (const btn of this.toolButtons) {
+      btn.addEventListener('click', () => this.app.setTool(btn.dataset.tool));
+    }
+    this.pauseBtn.addEventListener('click', () => this.app.togglePause());
+    byId('resetBtn').addEventListener('click', () => this.app.reset());
+    byId('clearBtn').addEventListener('click', () => this.app.clearAll());
+    this.settingsBtn.addEventListener('click', () => this.setPanelOpen(!this.panel.classList.contains('open')));
+  }
+
+  bindKeyboard() {
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      switch (e.key) {
+        case ' ':
+          e.preventDefault(); // don't scroll, don't "click" a focused button
+          if (!e.repeat) this.app.togglePause();
+          break;
+        case 'r': case 'R': if (!e.repeat) this.app.reset(); break;
+        case 'c': case 'C': if (!e.repeat) this.app.clearAll(); break;
+        case '1': this.app.setTool('spawn'); break;
+        case '2': this.app.setTool('attract'); break;
+        case '3': this.app.setTool('repel'); break;
+        default: break;
+      }
+    });
+    // Space "clicks" a focused button on key-UP, so cancel that too.
+    window.addEventListener('keyup', (e) => {
+      if (e.key === ' ') e.preventDefault();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Showing state
+  // ---------------------------------------------------------------------------
+
+  setSlider(id, value) {
+    byId(id).value = String(value);
+    this.paintSlider(id);
+  }
+
+  /** Update the number beside a slider and the filled part of its track. */
+  paintSlider(id) {
+    const input = byId(id);
+    const min = parseFloat(input.min);
+    const max = parseFloat(input.max);
+    const value = parseFloat(input.value);
+    input.style.setProperty('--fill', `${((value - min) / (max - min)) * 100}%`);
+    byId(`${id}Out`).textContent = SLIDERS[id].format(value);
+  }
+
+  /** Push the app's current state into every control (used at start-up and on Reset). */
+  syncFromState() {
+    const { world, renderer } = this.app;
+    const s = world.settings;
+    this.setSlider('gravity', s.gravity / CONFIG.G);
+    this.setSlider('bounce', s.restitution);
+    this.setSlider('count', world.count);
+    this.setSlider('force', s.pointerStrength / CONFIG.G);
+    this.setSlider('radius', s.pointerRadius);
+    byId('collisions').checked = s.collisions;
+    byId('trails').checked = renderer.trails;
+    this.setPaused(this.app.paused);
+    this.setTool(this.app.tool);
+  }
+
+  setTool(tool) {
+    for (const btn of this.toolButtons) {
+      btn.setAttribute('aria-pressed', String(btn.dataset.tool === tool));
+    }
+    this.hint.textContent = TOOL_HINTS[tool];
+  }
+
+  setPaused(paused) {
+    this.pauseLabel.textContent = paused ? 'Resume' : 'Pause';
+    this.pauseIcon.setAttribute('href', paused ? '#i-play' : '#i-pause');
+    this.pauseBtn.classList.toggle('is-on', paused);
+    this.statStatus.textContent = paused ? 'Paused' : 'Running';
+    this.statStatus.classList.toggle('is-paused', paused);
+  }
+
+  setPanelOpen(open) {
+    this.panel.classList.toggle('open', open);
+    document.body.classList.toggle('panel-open', open); // lets CSS hide the hint behind the phone sheet
+    this.settingsBtn.setAttribute('aria-expanded', String(open));
+    this.settingsBtn.classList.toggle('is-on', open);
+  }
+
+  /** Called every frame; only touches the DOM a few times per second. */
+  updateStats(frameDt) {
+    // Exponential moving average so the FPS number doesn't flicker.
+    this.fps += (1 / Math.max(frameDt, 0.001) - this.fps) * 0.1;
+    this.statTimer += frameDt;
+    if (this.statTimer < 0.25) return;
+    this.statTimer = 0;
+
+    const count = this.app.world.count;
+    this.statCount.textContent = String(count);
+    this.statFps.textContent = String(Math.round(this.fps));
+
+    // Spawning changes the count behind the slider's back, so keep it in sync
+    // (but never fight the user while they are dragging it).
+    const slider = byId('count');
+    if (document.activeElement !== slider && parseFloat(slider.value) !== count) {
+      this.setSlider('count', count);
+    }
+  }
+}
+
+</script>
+<script>
+/**
+ * main.js
+ * ---------------------------------------------------------------------------
+ * The App creates the other objects and runs the game loop. Each frame:
+ *
+ *     read input  ->  spawn / apply pointer force  ->  step physics  ->  draw
+ *
+ * requestAnimationFrame calls frame() right before the browser paints, usually
+ * 60 times a second (more on high-refresh screens), and pauses automatically
+ * when the tab is hidden, which saves battery.
+ */
+class App {
+  constructor() {
+    this.canvas = document.getElementById('universe');
+
+    const limits = window.innerWidth < 700 ? CONFIG.limits.mobile : CONFIG.limits.desktop;
+    this.defaultCount = limits.initialCount;
+
+    const { width, height } = this.measure();
+    this.world = new PhysicsWorld(width, height, limits.maxParticles);
+    this.renderer = new Renderer(this.canvas);
+    this.renderer.resize(width, height);
+    this.input = new InputController(this.canvas);
+
+    this.tool = 'spawn'; // 'spawn' | 'attract' | 'repel'
+    this.paused = false;
+    this.spawnCarry = 0; // fractional particles owed to the spawner between frames
+
+    this.controls = new Controls(this);
+    this.reset();
+
+    window.addEventListener('resize', () => this.handleResize());
+    window.addEventListener('orientationchange', () => this.handleResize());
+
+    this.frame = this.frame.bind(this);
+    this.lastTime = performance.now();
+    requestAnimationFrame(this.frame);
+  }
+
+  measure() {
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      width: rect.width || window.innerWidth,
+      height: rect.height || window.innerHeight,
+    };
+  }
+
+  handleResize() {
+    const { width, height } = this.measure();
+    this.renderer.resize(width, height);
+    this.world.resize(width, height);
+  }
+
+  // ---------------------------------------------------------------------------
+  // User actions (called by the Controls)
+  // ---------------------------------------------------------------------------
+
+  setTool(tool) {
+    this.tool = tool;
+    this.spawnCarry = 0;
+    this.controls.setTool(tool);
+  }
+
+  togglePause() {
+    this.paused = !this.paused;
+    this.controls.setPaused(this.paused);
+  }
+
+  clearAll() {
+    this.world.clear();
+  }
+
+  /** Back to a fresh start: default settings, default particle count, running. */
+  reset() {
+    this.world.clear();
+    this.world.settings = PhysicsWorld.defaultSettings();
+    this.world.setCount(this.defaultCount);
+    this.renderer.trails = CONFIG.defaults.trails;
+    this.paused = false;
+    this.controls.syncFromState();
+  }
+
+  // ---------------------------------------------------------------------------
+  // The loop
+  // ---------------------------------------------------------------------------
+
+  frame(now) {
+    // Seconds since the previous frame. Clamped so a long stall (e.g. switching
+    // tabs) can't produce one giant physics step.
+    const dt = Math.min((now - this.lastTime) / 1000, 0.1);
+    this.lastTime = now;
+
+    this.input.update(dt);
+    this.handleSpawning(dt);
+    this.syncPointerForce();
+
+    if (!this.paused) this.world.update(dt);
+
+    this.renderer.render(this.world, this.input, this.tool, now / 1000);
+    this.controls.updateStats(dt);
+
+    requestAnimationFrame(this.frame);
+  }
+
+  /** Spawn tool: a burst on the initial press, then a steady stream while held. */
+  handleSpawning(dt) {
+    const pressed = this.input.consumePress();
+    if (this.tool !== 'spawn') {
+      this.spawnCarry = 0;
+      return;
+    }
+
+    if (pressed) this.spawnBurst(CONFIG.spawn.burst);
+
+    if (this.input.down) {
+      // Rate * dt is usually a fraction (45/s * 0.016s = 0.72 particles). Keep
+      // the remainder so the long-run rate is exact at any frame rate.
+      this.spawnCarry += CONFIG.spawn.rate * dt;
+      const whole = Math.floor(this.spawnCarry);
+      this.spawnCarry -= whole;
+      this.spawnBurst(whole);
+    }
+  }
+
+  spawnBurst(count) {
+    const S = CONFIG.spawn;
+    const { x, y, vx, vy } = this.input;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = rand(S.minSpeed, S.maxSpeed);
+      const scatter = Math.random() * 10;
+      this.world.addParticle(
+        x + Math.cos(angle) * scatter,
+        y + Math.sin(angle) * scatter,
+        Math.cos(angle) * speed + vx * S.flingFactor, // random spread + a share of the pointer's motion
+        Math.sin(angle) * speed + vy * S.flingFactor
+      );
+    }
+  }
+
+  /** Attract / Repel: tell the physics where the pointer is and whether it is pushing or pulling. */
+  syncPointerForce() {
+    const ptr = this.world.pointer;
+    ptr.x = this.input.x;
+    ptr.y = this.input.y;
+    ptr.mode = this.input.down && this.tool !== 'spawn' ? this.tool : 'off';
+  }
+}
+
+// Scripts are loaded with `defer`, so the DOM is ready by the time this runs.
+window.particleUniverse = new App(); // exposed on window so you can poke at it in the console
+
+</script>
+</body>
+</html>
